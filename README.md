@@ -1,55 +1,68 @@
 # Mosaic Image Generator
-※Clineにより生成したコード
+**Created by Cline(Clineにより作成)**
 
-このGoライブラリは、k-means法を用いて画像をモザイク化するためのツールです。入力画像をブロックに分割し、k-means法による色の量子化を適用してモザイク効果を生成します。
+A Go library for creating mosaic images using k-means clustering. This tool processes input images by dividing them into blocks and applying k-means clustering for color quantization to create a mosaic effect.
 
-ライブラリとしての利用とCLIツールとしての利用の両方に対応しています。
+Can be used both as a library and as a CLI tool.
 
-## 特徴
+## Features
 
-- k-means法による色の量子化
-- モザイクブロックサイズの設定が可能
-- 使用する色数（kの値）の調整が可能
-- PNG、JPEG形式の画像をサポート
+- Color quantization using k-means clustering
+- Configurable mosaic block size
+- Adjustable number of colors (k value)
+- Support for PNG and JPEG images
+- Selective region mosaic processing
 
-## インストール
+## Installation
 
-### ライブラリとして
+### As a Library
 ```bash
 go get github.com/kohge4/mosaic-image
 ```
 
-### CLIツールとして
+### As a CLI Tool
 ```bash
 go install github.com/kohge4/mosaic-image/cmd/mosaic@latest
 ```
 
-## 使用方法
+## Usage
 
-### CLIツールとして
+### CLI Tool
 
 ```bash
-# 基本的な使用方法
+# Basic usage
 mosaic -input input.png -output output.png
 
-# オプションを指定
+# With custom options
 mosaic -input input.png -output output.png -k 16 -block 20
 
-# 利用可能なオプション
+# Show available options
 mosaic -help
 ```
 
-利用可能なオプション：
-- `-input`: 入力画像のパス（必須）
-- `-output`: 出力画像のパス（必須）
-- `-k`: 使用する色数（デフォルト: 8）
-- `-block`: モザイクブロックのサイズ（デフォルト: 10）
-- `-iterations`: k-meansの最大イテレーション回数（デフォルト: 50）
-- `-tolerance`: k-meansの収束判定の閾値（デフォルト: 0.001）
+Available options:
+- `-input`: Path to input image (required)
+- `-output`: Path to output image (required)
+- `-k`: Number of colors to use (default: 8)
+- `-block`: Size of mosaic blocks in pixels (default: 10)
+- `-iterations`: Maximum number of k-means iterations (default: 50)
+- `-tolerance`: Convergence tolerance for k-means (default: 0.001)
 
-### ライブラリとして
+Region options:
+- `-x`: X-coordinate of top-left corner for mosaic region (-1 for entire width)
+- `-y`: Y-coordinate of top-left corner for mosaic region (-1 for entire height)
+- `-width`: Width of mosaic region (-1 for remaining width)
+- `-height`: Height of mosaic region (-1 for remaining height)
 
-基本的な使用例：
+Example with region:
+```bash
+# Apply mosaic effect to a 200x200 region starting at (100,100)
+mosaic -input input.png -output output.png -x 100 -y 100 -width 200 -height 200
+```
+
+### As a Library
+
+Basic usage:
 
 ```go
 package main
@@ -63,41 +76,80 @@ import (
 )
 
 func main() {
-    // 画像を開いてデコード
+    // Open and decode image
     file, _ := os.Open("input.png")
     img, _, _ := image.Decode(file)
     file.Close()
 
-    // オプションを設定
+    // Configure options
     opts := mosaic.DefaultOptions()
-    opts.K = 8          // 使用する色数
-    opts.BlockSize = 10 // モザイクブロックのサイズ（ピクセル）
+    opts.K = 8          // number of colors
+    opts.BlockSize = 10 // size of mosaic blocks in pixels
 
-    // モザイク画像を生成
+    // Create mosaic
     mosaicImg := mosaic.CreateMosaic(img, opts)
 
-    // 結果を保存
+    // Save result
     outFile, _ := os.Create("output.png")
     png.Encode(outFile, mosaicImg)
     outFile.Close()
 }
 ```
 
-## 設定オプション
+## Configuration Options
 
-`MosaicOptions`構造体で以下の設定をカスタマイズできます：
+The `MosaicOptions` struct allows customization of the following settings:
 
-- `K`: 使用する色数（デフォルト: 8）
-- `BlockSize`: モザイクブロックのサイズ（ピクセル単位、デフォルト: 10）
-- `Iterations`: k-meansの最大イテレーション回数（デフォルト: 50）
-- `Tolerance`: k-meansの収束判定の閾値（デフォルト: 0.001）
+- `K`: Number of colors to use (default: 8)
+- `BlockSize`: Size of mosaic blocks in pixels (default: 10)
+- `Iterations`: Maximum number of k-means iterations (default: 50)
+- `Tolerance`: Convergence tolerance for k-means (default: 0.001)
+- `Region`: Region to apply mosaic effect (nil for entire image)
+  - `X`: X-coordinate of top-left corner
+  - `Y`: Y-coordinate of top-left corner
+  - `Width`: Width of the region
+  - `Height`: Height of the region
 
-`DefaultOptions()`を使用してデフォルト設定を取得し、必要に応じて変更することができます。
+Use `DefaultOptions()` to get default settings and modify them as needed.
 
-## ライセンス
+## Example with Region
 
-MIT License
+```go
+package main
 
-## 貢献
+import (
+    "image"
+    "image/png"
+    "os"
 
-プルリクエストや提案は大歓迎です！
+    "github.com/kohge4/mosaic-image"
+)
+
+func main() {
+    // Open and decode image
+    file, _ := os.Open("input.png")
+    img, _, _ := image.Decode(file)
+    file.Close()
+
+    // Configure options with region
+    opts := mosaic.DefaultOptions()
+    opts.Region = &mosaic.Region{
+        X:      100,
+        Y:      100,
+        Width:  200,
+        Height: 200,
+    }
+
+    // Create mosaic (only affects specified region)
+    mosaicImg := mosaic.CreateMosaic(img, opts)
+
+    // Save result
+    outFile, _ := os.Create("output.png")
+    png.Encode(outFile, mosaicImg)
+    outFile.Close()
+}
+```
+
+## Contributing
+
+Pull requests and suggestions are welcome!

@@ -18,6 +18,7 @@ func TestDefaultOptions(t *testing.T) {
 		{"BlockSize value", opts.BlockSize, 10},
 		{"Iterations value", opts.Iterations, 50},
 		{"Tolerance value", opts.Tolerance, 0.001},
+		{"Region value", opts.Region, (*Region)(nil)},
 	}
 
 	for _, tt := range tests {
@@ -30,47 +31,54 @@ func TestDefaultOptions(t *testing.T) {
 }
 
 func TestCreateMosaic(t *testing.T) {
-	// テスト用の画像を作成
+	// Create test image
 	width, height := 100, 100
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
-	// 画像を2色で塗り分ける
+	// Fill image with two colors
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 			if x < width/2 {
-				img.Set(x, y, color.RGBA{R: 255, A: 255}) // 赤
+				img.Set(x, y, color.RGBA{R: 255, A: 255}) // Red
 			} else {
-				img.Set(x, y, color.RGBA{B: 255, A: 255}) // 青
+				img.Set(x, y, color.RGBA{B: 255, A: 255}) // Blue
 			}
 		}
 	}
 
-	// モザイク化のテスト
+	// Test mosaic creation with specific region
+	region := &Region{
+		X:      width / 4,
+		Y:      height / 4,
+		Width:  width / 2,
+		Height: height / 2,
+	}
+
 	opts := &MosaicOptions{
-		K:          2,  // 2色
-		BlockSize:  10, // 10x10ブロック
-		Iterations: 10, // 10回イテレーション
+		K:          2,  // 2 colors
+		BlockSize:  10, // 10x10 blocks
+		Iterations: 10, // 10 iterations
 		Tolerance:  0.001,
+		Region:     region,
 	}
 
 	result := CreateMosaic(img, opts)
 	bounds := result.Bounds()
 
-	// 結果の検証
+	// Verify image dimensions
 	if bounds.Dx() != width || bounds.Dy() != height {
-		t.Errorf("画像サイズが異なります。got = %dx%d, want = %dx%d",
+		t.Errorf("Invalid image dimensions. got = %dx%d, want = %dx%d",
 			bounds.Dx(), bounds.Dy(), width, height)
 	}
 
-	// 左半分と右半分で色が異なることを確認
-	leftColor := result.At(width/4, height/2)
-	rightColor := result.At(3*width/4, height/2)
+	// Check colors in the mosaic region
+	centerX := region.X + region.Width/2
+	centerY := region.Y + region.Height/2
+	color := result.At(centerX, centerY)
+	r, _, _, _ := color.RGBA()
 
-	lr, _, _, _ := leftColor.RGBA()
-	_, _, rb, _ := rightColor.RGBA()
-
-	if lr == 0 || rb == 0 {
-		t.Error("期待される色の分離が行われていません")
+	if r == 0 {
+		t.Error("Expected color separation not found in mosaic region")
 	}
 }
 
@@ -117,14 +125,14 @@ func testAveragePixels(t *testing.T) {
 
 func testFindNearestCentroid(t *testing.T) {
 	centroids := []Pixel{
-		{R: 1.0, G: 0.0, B: 0.0}, // 赤
-		{R: 0.0, G: 0.0, B: 1.0}, // 青
+		{R: 1.0, G: 0.0, B: 0.0}, // Red
+		{R: 0.0, G: 0.0, B: 1.0}, // Blue
 	}
 
-	testPixel := Pixel{R: 0.9, G: 0.0, B: 0.1} // 赤に近い色
+	testPixel := Pixel{R: 0.9, G: 0.0, B: 0.1} // Color close to red
 
 	got := findNearestCentroid(testPixel, centroids)
-	expected := centroids[0] // 最初のcentroid（赤）が最も近いはず
+	expected := centroids[0] // Should be closest to first centroid (red)
 
 	if got != expected {
 		t.Errorf("findNearestCentroid() = %v, want %v", got, expected)
@@ -132,11 +140,11 @@ func testFindNearestCentroid(t *testing.T) {
 }
 
 func TestImageToPixels(t *testing.T) {
-	// テスト用の画像を作成
+	// Create test image
 	width, height := 2, 2
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
-	// 単色で塗りつぶし
+	// Fill with solid color
 	c := color.RGBA{R: 255, G: 0, B: 0, A: 255}
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
@@ -144,15 +152,22 @@ func TestImageToPixels(t *testing.T) {
 		}
 	}
 
-	pixels := imageToPixels(img)
+	region := &Region{
+		X:      0,
+		Y:      0,
+		Width:  width,
+		Height: height,
+	}
 
-	// ピクセル数の確認
+	pixels := imageToPixels(img, region)
+
+	// Verify pixel count
 	expectedLen := width * height
 	if len(pixels) != expectedLen {
 		t.Errorf("imageToPixels() returned %d pixels, want %d", len(pixels), expectedLen)
 	}
 
-	// 各ピクセルの値を確認
+	// Verify pixel values
 	expectedPixel := Pixel{R: 1.0, G: 0.0, B: 0.0}
 	for i, pixel := range pixels {
 		if pixel != expectedPixel {

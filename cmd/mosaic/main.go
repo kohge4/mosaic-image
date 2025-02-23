@@ -12,66 +12,96 @@ import (
 )
 
 func main() {
-	// コマンドライン引数の解析
-	input := flag.String("input", "", "入力画像のパス（必須）")
-	output := flag.String("output", "", "出力画像のパス（必須）")
-	k := flag.Int("k", 8, "使用する色数")
-	blockSize := flag.Int("block", 10, "モザイクブロックのサイズ（ピクセル）")
-	iterations := flag.Int("iterations", 50, "k-meansの最大イテレーション回数")
-	tolerance := flag.Float64("tolerance", 0.001, "k-meansの収束判定の閾値")
+	// Parse command line arguments
+	input := flag.String("input", "", "Path to input image (required)")
+	output := flag.String("output", "", "Path to output image (required)")
+	k := flag.Int("k", 8, "Number of colors to use")
+	blockSize := flag.Int("block", 10, "Size of mosaic blocks in pixels")
+	iterations := flag.Int("iterations", 50, "Maximum number of k-means iterations")
+	tolerance := flag.Float64("tolerance", 0.001, "Convergence tolerance for k-means")
+
+	// Region options
+	x := flag.Int("x", -1, "X-coordinate of top-left corner for mosaic region (-1 for entire width)")
+	y := flag.Int("y", -1, "Y-coordinate of top-left corner for mosaic region (-1 for entire height)")
+	width := flag.Int("width", -1, "Width of mosaic region (-1 for remaining width)")
+	height := flag.Int("height", -1, "Height of mosaic region (-1 for remaining height)")
 
 	flag.Parse()
 
-	// 必須パラメータのチェック
+	// Check required parameters
 	if *input == "" || *output == "" {
-		fmt.Println("Error: input と output は必須パラメータです")
+		fmt.Println("Error: input and output paths are required")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	// 入力画像の読み込み
+	// Open input image
 	file, err := os.Open(*input)
 	if err != nil {
-		fmt.Printf("Error: 入力画像を開けません: %v\n", err)
+		fmt.Printf("Error: could not open input image: %v\n", err)
 		os.Exit(1)
 	}
 	defer file.Close()
 
-	// 画像のデコード
+	// Decode image
 	img, _, err := image.Decode(file)
 	if err != nil {
-		fmt.Printf("Error: 画像のデコードに失敗しました: %v\n", err)
+		fmt.Printf("Error: could not decode image: %v\n", err)
 		os.Exit(1)
 	}
 
-	// モザイクオプションの設定
+	// Configure mosaic options
 	opts := mosaic.DefaultOptions()
 	opts.K = *k
 	opts.BlockSize = *blockSize
 	opts.Iterations = *iterations
 	opts.Tolerance = *tolerance
 
-	// モザイク画像の生成
-	mosaicImg := mosaic.CreateMosaic(img, opts)
+	// Configure region if specified
+	bounds := img.Bounds()
+	if *x >= 0 && *y >= 0 {
+		regionX := *x
+		regionY := *y
+		regionWidth := *width
+		regionHeight := *height
 
-	// 出力ディレクトリの作成
+		// Use remaining width/height if not specified
+		if regionWidth < 0 {
+			regionWidth = bounds.Max.X - regionX
+		}
+		if regionHeight < 0 {
+			regionHeight = bounds.Max.Y - regionY
+		}
+
+		opts.Region = &mosaic.Region{
+			X:      regionX,
+			Y:      regionY,
+			Width:  regionWidth,
+			Height: regionHeight,
+		}
+	}
+
+	// Create output directory if needed
 	if err := os.MkdirAll(filepath.Dir(*output), 0755); err != nil {
-		fmt.Printf("Error: 出力ディレクトリの作成に失敗しました: %v\n", err)
+		fmt.Printf("Error: could not create output directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 結果の保存
+	// Generate mosaic image
+	mosaicImg := mosaic.CreateMosaic(img, opts)
+
+	// Save result
 	outFile, err := os.Create(*output)
 	if err != nil {
-		fmt.Printf("Error: 出力ファイルの作成に失敗しました: %v\n", err)
+		fmt.Printf("Error: could not create output file: %v\n", err)
 		os.Exit(1)
 	}
 	defer outFile.Close()
 
 	if err := png.Encode(outFile, mosaicImg); err != nil {
-		fmt.Printf("Error: 画像の保存に失敗しました: %v\n", err)
+		fmt.Printf("Error: could not save image: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("モザイク画像を生成しました:", *output)
+	fmt.Println("Mosaic image created successfully:", *output)
 }

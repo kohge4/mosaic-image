@@ -3,6 +3,7 @@ package mosaic
 import (
 	"image"
 	"image/color"
+	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
 	"math"
@@ -14,12 +15,21 @@ type Pixel struct {
 	R, G, B float64
 }
 
+// Region defines the area to apply mosaic effect
+type Region struct {
+	X      int // x-coordinate of top-left corner
+	Y      int // y-coordinate of top-left corner
+	Width  int // width of the region
+	Height int // height of the region
+}
+
 // MosaicOptions contains configuration for mosaic generation
 type MosaicOptions struct {
 	K          int     // number of colors for k-means
 	BlockSize  int     // size of mosaic blocks
 	Iterations int     // number of k-means iterations
 	Tolerance  float64 // convergence tolerance
+	Region     *Region // region to apply mosaic effect (nil for entire image)
 }
 
 // DefaultOptions returns default mosaic options
@@ -29,6 +39,7 @@ func DefaultOptions() *MosaicOptions {
 		BlockSize:  10,
 		Iterations: 50,
 		Tolerance:  0.001,
+		Region:     nil,
 	}
 }
 
@@ -38,23 +49,46 @@ func CreateMosaic(img image.Image, opts *MosaicOptions) image.Image {
 		opts = DefaultOptions()
 	}
 
-	// Convert image to pixels
-	pixels := imageToPixels(img)
+	bounds := img.Bounds()
+	region := opts.Region
+	if region == nil {
+		region = &Region{
+			X:      bounds.Min.X,
+			Y:      bounds.Min.Y,
+			Width:  bounds.Dx(),
+			Height: bounds.Dy(),
+		}
+	}
+
+	// Validate region
+	if region.X < bounds.Min.X || region.Y < bounds.Min.Y ||
+		region.X+region.Width > bounds.Max.X || region.Y+region.Height > bounds.Max.Y {
+		// If invalid region, use entire image
+		region = &Region{
+			X:      bounds.Min.X,
+			Y:      bounds.Min.Y,
+			Width:  bounds.Dx(),
+			Height: bounds.Dy(),
+		}
+	}
+
+	// Create output image (copy of original)
+	mosaic := image.NewRGBA(bounds)
+	draw.Draw(mosaic, bounds, img, bounds.Min, draw.Src)
+
+	// Convert specified region to pixels
+	pixels := imageToPixels(img, region)
 
 	// Perform k-means clustering
 	centroids := kmeans(pixels, opts.K, opts.Iterations, opts.Tolerance)
 
-	// Create mosaic image
-	bounds := img.Bounds()
-	mosaic := image.NewRGBA(bounds)
-
-	// Process each block
-	for y := bounds.Min.Y; y < bounds.Max.Y; y += opts.BlockSize {
-		for x := bounds.Min.X; x < bounds.Max.X; x += opts.BlockSize {
+	// Process each block within the specified region
+	for y := region.Y; y < region.Y+region.Height; y += opts.BlockSize {
+		for x := region.X; x < region.X+region.Width; x += opts.BlockSize {
 			// Calculate average color for the block
 			blockPixels := make([]Pixel, 0)
-			for by := 0; by < opts.BlockSize && y+by < bounds.Max.Y; by++ {
-				for bx := 0; bx < opts.BlockSize && x+bx < bounds.Max.X; bx++ {
+			for by := 0; by < opts.BlockSize && y+by < region.Y+region.Height; by++ {
+				for bx := 0; bx < opts.BlockSize && x+bx < region.X+region.Width; bx++ {
 					r, g, b, _ := img.At(x+bx, y+by).RGBA()
 					blockPixels = append(blockPixels, Pixel{
 						R: float64(r) / 65535,
@@ -82,13 +116,12 @@ func CreateMosaic(img image.Image, opts *MosaicOptions) image.Image {
 	return mosaic
 }
 
-// imageToPixels converts an image to a slice of Pixels
-func imageToPixels(img image.Image) []Pixel {
-	bounds := img.Bounds()
-	pixels := make([]Pixel, 0, bounds.Dx()*bounds.Dy())
+// imageToPixels converts a region of an image to a slice of Pixels
+func imageToPixels(img image.Image, region *Region) []Pixel {
+	pixels := make([]Pixel, 0, region.Width*region.Height)
 
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+	for y := region.Y; y < region.Y+region.Height; y++ {
+		for x := region.X; x < region.X+region.Width; x++ {
 			r, g, b, _ := img.At(x, y).RGBA()
 			pixels = append(pixels, Pixel{
 				R: float64(r) / 65535,

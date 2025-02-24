@@ -1,4 +1,9 @@
 # Mosaic Image Generator
+
+[![Test](https://github.com/kohge4/mosaic-image/actions/workflows/test.yml/badge.svg)](https://github.com/kohge4/mosaic-image/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kohge4/mosaic-image)](https://goreportcard.com/report/github.com/kohge4/mosaic-image)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kohge4/mosaic-image.svg)](https://pkg.go.dev/github.com/kohge4/mosaic-image)
+
 **Created by Cline(Clineにより作成)**
 
 A Go library for creating mosaic images using k-means clustering. This tool processes input images by dividing them into blocks and applying k-means clustering for color quantization to create a mosaic effect.
@@ -152,4 +157,27 @@ func main() {
 
 ## Contributing
 
-Pull requests and suggestions are welcome!
+Pull requests and suggestions are welcome! This project uses GitHub Actions for continuous integration and Dependabot for dependency management.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a new branch for your feature/fix
+3. Make your changes
+4. Run tests locally: `go test -v ./...`
+5. Run linter: `golangci-lint run`
+6. Submit a pull request
+
+### Continuous Integration
+
+- All pull requests are automatically tested using GitHub Actions
+- Tests are run on multiple Go versions (1.23)
+- Code quality is checked using golangci-lint
+- Dependencies are automatically kept up to date using Dependabot
+
+### Code Quality
+
+- Follow Go best practices and style guidelines
+- Write tests for new features
+- Keep dependencies up to date
+- Document public APIs
